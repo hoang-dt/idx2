@@ -9,8 +9,31 @@
 #include "idx2Decode.h"
 
 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+
 namespace idx2
 {
+
+
+std::string
+cstring(u64 value)
+{
+  std::ostringstream out;
+  out << value;
+  return out.str();
+}
+
+std::string ReafFile(const std::string& path)
+{
+  std::ostringstream buf;
+  std::ifstream input(path.c_str());
+  buf << input.rdbuf();
+  return buf.str();
+}
+
 
 
 static void
@@ -56,6 +79,10 @@ DeallocFileCacheTable(file_cache_table* FileCacheTable)
 static error<idx2_err_code>
 ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id& FileId)
 {
+#if VISUS_IDX2 //no need to read metadata
+  return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
+#else
+
   timer IOTimer;
   StartTimer(&IOTimer);
 
@@ -126,6 +153,7 @@ ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id&
   FileCacheIt->Val->DataCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
+#endif 
 }
 
 
@@ -133,6 +161,15 @@ ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id&
 expected<const chunk_cache*, idx2_err_code>
 ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
 {
+#if VISUS_IDX2 //read chunk
+
+  std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, BitPlane));
+  std::string buffer = ReafFile(Key);
+  //TODO: how to return the results?
+  return idx2_Error(idx2_err_code::ChunkNotFound);
+
+#else
+
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
   idx2_PropagateIfError(ReadFile(D, &FileCacheIt, FileId));
@@ -171,6 +208,7 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
   }
 
   return ChunkCacheIt.Val;
+#endif
 }
 
 
@@ -182,6 +220,9 @@ ReadFileExponents(const idx2_file& Idx2,
                   file_cache_table::iterator* FileCacheIt,
                   const file_id& FileId)
 {
+#if VISUS_IDX2 //no need to read exponent metadata
+  return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
+#else
   timer IOTimer;
   StartTimer(&IOTimer);
 
@@ -263,6 +304,7 @@ ReadFileExponents(const idx2_file& Idx2,
   FileCacheIt->Val->ExpCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
+#endif 
 }
 
 
@@ -271,6 +313,14 @@ ReadFileExponents(const idx2_file& Idx2,
 expected<const chunk_exp_cache*, idx2_err_code>
 ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
 {
+#if VISUS_IDX2 // read chunk exponent
+  std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, ExponentBitPlane_));
+  std::string buffer = ReafFile(Key);
+  // TODO: how to return the results?
+  return idx2_Error(idx2_err_code::ChunkNotFound);
+
+#else
+
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
   idx2_PropagateIfError(ReadFileExponents(Idx2, D, Level, &FileCacheIt, FileId));
@@ -315,6 +365,9 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
   }
 
   return ChunkCacheIt.Val;
+
+#endif
+
 }
 
 

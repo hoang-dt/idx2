@@ -37,6 +37,24 @@ idx2App --decode Miranda/Viscosity.idx2 --downsampling 1 1 1 --tolerance 0.001
 <!-- The output will be written to a raw file in the current directory. -->
 Optionally, use `--first x_begin y_begin z_begin` and `--last x_end y_end z_end` (the end points are inclusive) to specify the region of interest instead of decoding the whole field.
 
+If you want to extract just one slice, for example:
+
+```
+idx2App --decode Miranda/Viscosity.idx2 --downsampling 1 1 1 --tolerance 0.001 --first 0 0 128 --last 383 383 128
+```
+
+If you want to see your data. for example:
+
+```
+python3
+import numpy as np
+import imageio
+W,H=193,193
+dtype="float64"
+data = np.fromfile(f'Miranda-Viscosity-[{W}-{H}-1]-{dtype}-accuracy-0.001000.raw', dtype=dtype).reshape((W, H))
+imageio.imwrite('out.tiff', data)
+```
+
 # Using the C++ API to read from an idx2 dataset to memory
 
 See the `Source/Applications/idx2Samples.cpp` file for an example of how to use idx2's C++ API.

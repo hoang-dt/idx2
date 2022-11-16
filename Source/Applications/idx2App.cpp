@@ -9,6 +9,12 @@
 
 using namespace idx2;
 
+void keep_window_open()
+{
+  getchar();
+  return;
+}
+
 
 /* Parse the decode options */
 static void
@@ -264,6 +270,10 @@ SetParams(idx2_file* Idx2, const params& P)
 int
 main(int Argc, cstr* Argv)
 {
+#if _DEBUG 
+  atexit(keep_window_open);
+#endif
+
   SetHandleAbortSignals();
 
   idx2_RAII(params, P, P = ParseParams(Argc, Argv));

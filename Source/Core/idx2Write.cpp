@@ -6,9 +6,22 @@
 #include "Statistics.h"
 #include "VarInt.h"
 
+#include <string>
+#include <fstream> 
+#include <sstream>
+#include <iostream>
 
 namespace idx2
 {
+
+
+std::string
+cstring(u64 value)
+{
+  std::ostringstream out;
+  out << value;
+  return out.str();
+}
 
 
 /* book-keeping stuffs */
@@ -99,7 +112,17 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
   idx2_ForEach (CeIt, E->ChunkExponents) // one CeIt for each file
   {
     chunk_exp_info* Ce = CeIt.Val;
+
+#if VISUS_IDX2 //write chunk exponent
+    std::string Key = cstring(*CeIt.Key);
+    buffer Buf = ToBuffer(Ce->FileExpBuffer);
+    std::cout << "Writing exponent " << Key << " size=" <<Size(Buf) << std::endl;
+    std::ofstream out(Key.c_str(), std::ofstream::out);
+    out.write((const char*)Buf.Data, Size(Buf));
+    out.close();
+#else
     bitstream* ChunkExpSizes = &Ce->ExpSizes;
+
     file_id FileId = ConstructFilePath(Idx2, *CeIt.Key);
     idx2_Assert(FileId.Id == *CeIt.Key);
     /* write chunk emax sizes */
@@ -128,6 +151,8 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
     // write the total number of bytes used for storing the exponents
     TotalExpBytes += sizeof(int);
     WritePOD(Fp, (int)TotalExpBytes);
+#endif
+
     Dealloc(&CeIt.Val->FileExpBuffer);
   }
 
@@ -157,6 +182,15 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
   Rewind(&C->BrickSizeStream);
   Rewind(&C->BrickStream);
 
+ #if VISUS_IDX2 // write chunk
+  std::string Key = cstring(GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane));
+  buffer Buf = ToBuffer(E->ChunkStream);
+  std::cout << "Writing chunk " << Key << " size=" <<Size(Buf) << std::endl;
+  std::ofstream out(Key.c_str(), std::ofstream::out);
+  out.write((const char*)Buf.Data, Size(Buf));
+  out.close();
+#else
+
   /* write to file */
   file_id FileId = ConstructFilePath(Idx2, C->LastBrick, Level, Subband, BitPlane);
   idx2_OpenMaybeExistingFile(Fp, FileId.Name.ConstPtr, "ab");
@@ -177,6 +211,8 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
   u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
   PushBack(&ChunkMeta->Addrs, ChunkAddress);
   Rewind(&E->ChunkStream);
+
+#endif
 }
 
 
@@ -199,7 +235,9 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
     //printf("key %llu level %d subband %d bitplane %d\n", Ch->First, Level, Subband, BitPlane);
     WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane);
   }
-
+#if VISUS_IDX2 //no need to write chunk metadata
+  ; //is it right to not do anything?
+#else
   /* write the chunk meta */
   idx2_ForEach (CmIt, E->ChunkMeta)
   {
@@ -226,6 +264,7 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
     ChunkAddrsStat.Add((f64)Size(Cm->Addrs) * sizeof(Cm->Addrs[0]));
     CpresChunkAddrsStat.Add((f64)Size(E->CompressedChunkAddresses));
   }
+#endif
   return idx2_Error(idx2_err_code::NoError);
 }
 
