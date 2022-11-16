@@ -15,7 +15,7 @@ namespace idx2
 {
 
 
-std::string
+static std::string
 cstring(u64 value)
 {
   std::ostringstream out;
@@ -113,7 +113,7 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
   {
     chunk_exp_info* Ce = CeIt.Val;
 
-#if VISUS_IDX2 //write chunk exponent
+#if VISUS_IDX2 && 0 // write chunk exponent
     std::string Key = cstring(*CeIt.Key);
     buffer Buf = ToBuffer(Ce->FileExpBuffer);
     std::cout << "Writing exponent " << Key << " size=" <<Size(Buf) << std::endl;
@@ -182,7 +182,7 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
   Rewind(&C->BrickSizeStream);
   Rewind(&C->BrickStream);
 
- #if VISUS_IDX2 // write chunk
+ #if VISUS_IDX2 && 0 // write chunk
   std::string Key = cstring(GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane));
   buffer Buf = ToBuffer(E->ChunkStream);
   std::cout << "Writing chunk " << Key << " size=" <<Size(Buf) << std::endl;
@@ -235,7 +235,7 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
     //printf("key %llu level %d subband %d bitplane %d\n", Ch->First, Level, Subband, BitPlane);
     WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane);
   }
-#if VISUS_IDX2 //no need to write chunk metadata
+#if VISUS_IDX2 && 0 // no need to write chunk metadata
   ; //is it right to not do anything?
 #else
   /* write the chunk meta */

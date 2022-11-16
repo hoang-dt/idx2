@@ -6,6 +6,10 @@
 //#include "../idx2.hpp"
 #include "../idx2.h"
 
+#ifdef _WIN32
+#pragma warning(disable : 4996) //'fopen': This function or variable may be unsafe
+#endif
+
 
 using namespace idx2;
 

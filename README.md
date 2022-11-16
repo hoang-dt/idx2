@@ -41,19 +41,9 @@ If you want to extract just one slice, for example:
 
 ```
 idx2App --decode Miranda/Viscosity.idx2 --downsampling 1 1 1 --tolerance 0.001 --first 0 0 128 --last 383 383 128
+# python3 Libs/IDX2/Source/Applications/convert.py Miranda-Viscosity-[193-193-1]-float64-accuracy-0.001000.raw
 ```
 
-If you want to see your data. for example:
-
-```
-python3
-import numpy as np
-import imageio
-W,H=193,193
-dtype="float64"
-data = np.fromfile(f'Miranda-Viscosity-[{W}-{H}-1]-{dtype}-accuracy-0.001000.raw', dtype=dtype).reshape((W, H))
-imageio.imwrite('out.tiff', data)
-```
 
 # Using the C++ API to read from an idx2 dataset to memory
 

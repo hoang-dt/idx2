@@ -18,15 +18,14 @@ namespace idx2
 {
 
 
-std::string
-cstring(u64 value)
+static std::string cstring(u64 value)
 {
   std::ostringstream out;
   out << value;
   return out.str();
 }
 
-std::string ReafFile(const std::string& path)
+static std::string ReafFile(const std::string& path)
 {
   std::ostringstream buf;
   std::ifstream input(path.c_str());
@@ -79,7 +78,7 @@ DeallocFileCacheTable(file_cache_table* FileCacheTable)
 static error<idx2_err_code>
 ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id& FileId)
 {
-#if VISUS_IDX2 //no need to read metadata
+#if VISUS_IDX2 && 0 //no need to read metadata
   return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
 #else
 
@@ -161,7 +160,7 @@ ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id&
 expected<const chunk_cache*, idx2_err_code>
 ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
 {
-#if VISUS_IDX2 //read chunk
+#if VISUS_IDX2 && 0 //read chunk
 
   std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, BitPlane));
   std::string buffer = ReafFile(Key);
@@ -220,7 +219,7 @@ ReadFileExponents(const idx2_file& Idx2,
                   file_cache_table::iterator* FileCacheIt,
                   const file_id& FileId)
 {
-#if VISUS_IDX2 //no need to read exponent metadata
+#if VISUS_IDX2 && 0 // no need to read exponent metadata
   return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
 #else
   timer IOTimer;
@@ -313,7 +312,7 @@ ReadFileExponents(const idx2_file& Idx2,
 expected<const chunk_exp_cache*, idx2_err_code>
 ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
 {
-#if VISUS_IDX2 // read chunk exponent
+#if VISUS_IDX2 && 0 // read chunk exponent
   std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, ExponentBitPlane_));
   std::string buffer = ReafFile(Key);
   // TODO: how to return the results?
