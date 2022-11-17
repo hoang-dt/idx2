@@ -6,18 +6,8 @@
 //#include "../idx2.hpp"
 #include "../idx2.h"
 
-#ifdef _WIN32
-#pragma warning(disable : 4996) //'fopen': This function or variable may be unsafe
-#endif
-
 
 using namespace idx2;
-
-void keep_window_open()
-{
-  getchar();
-  return;
-}
 
 
 /* Parse the decode options */
@@ -274,10 +264,6 @@ SetParams(idx2_file* Idx2, const params& P)
 int
 main(int Argc, cstr* Argv)
 {
-#if _DEBUG 
-  atexit(keep_window_open);
-#endif
-
   SetHandleAbortSignals();
 
   idx2_RAII(params, P, P = ParseParams(Argc, Argv));
