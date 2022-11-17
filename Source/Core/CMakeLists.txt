@@ -80,34 +80,26 @@ set(IDX2_CORE_SOURCE_FILES
   Zfp.cpp
 )
 
-if (VISUS_IDX2)
-	add_library(idx2Core STATIC  ${IDX2_CORE_HEADER_FILES} ${IDX2_CORE_SOURCE_FILES})
-else()
-	add_library(idx2Core ${IDX2_CORE_HEADER_FILES} ${IDX2_CORE_SOURCE_FILES})
-endif()
-
-
+add_library(idx2Core ${IDX2_CORE_HEADER_FILES} ${IDX2_CORE_SOURCE_FILES})
 set_target_properties(idx2Core PROPERTIES
-	POSITION_INDEPENDENT_CODE ON
-	PUBLIC_HEADER "${IDX2_CORE_HEADER_FILES}")
+  POSITION_INDEPENDENT_CODE ON
+  PUBLIC_HEADER "${IDX2_CORE_HEADER_FILES}")
 target_compile_features(idx2Core PUBLIC cxx_std_17)
 target_compile_definitions(idx2Core PUBLIC -Didx2_Avx2)
 target_compile_definitions(idx2Core PUBLIC "$<$<CONFIG:DEBUG>:idx2_Slow>")
 
 if (MSVC)
-	target_compile_definitions(idx2Core PUBLIC -D_CRT_SECURE_NO_WARNINGS)
-	target_compile_options(idx2Core PUBLIC /arch:AVX2 /Zc:preprocessor /Zc:__cplusplus /wd5105)
-	target_link_options(idx2Core PUBLIC dbghelp.lib)
+  target_compile_definitions(idx2Core PUBLIC -D_CRT_SECURE_NO_WARNINGS)
+  target_compile_options(idx2Core PUBLIC /arch:AVX2 /Zc:preprocessor /Zc:__cplusplus /wd5105)
+  target_link_options(idx2Core PUBLIC dbghelp.lib)
 elseif (UNIX)
-	target_compile_options(idx2Core PUBLIC -Wno-format-zero-length -mavx2)
+  target_compile_options(idx2Core PUBLIC -Wno-format-zero-length -mavx2)
 endif()
 
-if (NOT VISUS_IDX2)
-	install(TARGETS idx2Core
-		EXPORT idx2CoreConfig
-		LIBRARY DESTINATION lib
-	  ARCHIVE DESTINATION lib
-	  PUBLIC_HEADER DESTINATION include/Core)
+install(TARGETS idx2Core
+	EXPORT idx2CoreConfig
+	LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  PUBLIC_HEADER DESTINATION include/Core)
 
-	install(EXPORT idx2CoreConfig DESTINATION lib/cmake/idx2)
-ENDIF()
+install(EXPORT idx2CoreConfig DESTINATION lib/cmake/idx2)

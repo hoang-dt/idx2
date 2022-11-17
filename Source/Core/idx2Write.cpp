@@ -122,7 +122,7 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
     out.close();
 #else
     bitstream* ChunkExpSizes = &Ce->ExpSizes;
-
+     
     file_id FileId = ConstructFilePath(Idx2, *CeIt.Key);
     idx2_Assert(FileId.Id == *CeIt.Key);
     /* write chunk emax sizes */
