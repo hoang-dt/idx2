@@ -152,7 +152,7 @@ ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id&
   FileCacheIt->Val->DataCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
-#endif 
+#endif
 }
 
 
@@ -303,7 +303,7 @@ ReadFileExponents(const idx2_file& Idx2,
   FileCacheIt->Val->ExpCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
-#endif 
+#endif
 }
 
 

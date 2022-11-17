@@ -7,21 +7,9 @@
 #include "VarInt.h"
 
 #include <string>
-#include <fstream> 
-#include <sstream>
-#include <iostream>
 
 namespace idx2
 {
-
-
-static std::string
-cstring(u64 value)
-{
-  std::ostringstream out;
-  out << value;
-  return out.str();
-}
 
 
 /* book-keeping stuffs */
@@ -39,7 +27,37 @@ static stat ChunkAddrsStat;
 static stat ChunkSzsStat;
 
 
-// Write once per chunk
+static void // TODO: return an error
+WriteBufferToFileAtAddress(const idx2_file& Idx2, u64 Address, const buffer& Buf)
+{
+  thread_local static char FilePath[256];
+  printer Pr(FilePath, sizeof(FilePath));
+  idx2_Print(&Pr, "%.*s/%s/%s/%" PRIi64, Idx2.Dir.Size, Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field, Address);
+  WriteBuffer(FilePath, Buf);
+}
+
+
+#if VISUS_IDX2 // write chunk exponent
+void
+WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 Level, i8 Subband)
+{
+  /* brick exponents */
+  Flush(&Sc->BrickExpStream);
+  BrickEMaxesStat.Add((f64)Size(Sc->BrickExpStream));
+  Rewind(&E->ChunkExpStream);
+  CompressBufZstd(ToBuffer(Sc->BrickExpStream), &E->ChunkExpStream);
+  //  PushBack(&E->FileEMaxBuffer, E->ChunkEMaxesStream.Stream.Data, Size(E->ChunkEMaxesStream));
+  ChunkEMaxesStat.Add((f64)Size(E->ChunkExpStream));
+
+  /* rewind */
+  Rewind(&Sc->BrickExpStream);
+  u64 ChunkExpAddress = GetChunkAddress(Idx2, Sc->LastBrick, Level, Subband, ExponentBitPlane_);
+  buffer Buf = ToBuffer(E->ChunkExpStream);
+  WriteBufferToFileAtAddress(Idx2, ChunkExpAddress, Buf);
+  //std::cout << "Writing exponent " << ChunkExpAddress << " size=" <<Size(Buf) << std::endl;
+  Rewind(&E->ChunkExpStream);
+}
+#else
 void
 WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 Level, i8 Subband)
 {
@@ -83,8 +101,33 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
   PushBack(&Ce->Addrs, ChunkExpAddress);
   Rewind(&E->ChunkExpStream);
 }
+#endif
+// Write once per chunk
 
 
+#if VISUS_IDX2
+error<idx2_err_code>
+FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
+{
+  Reserve(&E->SortedSubChannels, Size(E->SubChannels));
+  Clear(&E->SortedSubChannels);
+  idx2_ForEach (Sch, E->SubChannels)
+  {
+    sub_channel_info ScInfo;
+    ScInfo.SubChannel = &*Sch;
+    u64 Brick;
+    i16 BitPlane;
+    UnpackAddress(Idx2, *Sch.Key, &Brick, &ScInfo.Level, &ScInfo.Subband, &BitPlane);
+    PushBack(&E->SortedSubChannels, ScInfo);
+  }
+  InsertionSort(Begin(E->SortedSubChannels), End(E->SortedSubChannels));
+
+  idx2_ForEach (Sch, E->SortedSubChannels)
+    WriteChunkExponents(Idx2, E, Sch->SubChannel, Sch->Level, Sch->Subband);
+
+  return idx2_Error(idx2_err_code::NoError);
+}
+#else
 // TODO: check the error path
 error<idx2_err_code>
 FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
@@ -112,17 +155,7 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
   idx2_ForEach (CeIt, E->ChunkExponents) // one CeIt for each file
   {
     chunk_exp_info* Ce = CeIt.Val;
-
-#if VISUS_IDX2 && 0 // write chunk exponent
-    std::string Key = cstring(*CeIt.Key);
-    buffer Buf = ToBuffer(Ce->FileExpBuffer);
-    std::cout << "Writing exponent " << Key << " size=" <<Size(Buf) << std::endl;
-    std::ofstream out(Key.c_str(), std::ofstream::out);
-    out.write((const char*)Buf.Data, Size(Buf));
-    out.close();
-#else
     bitstream* ChunkExpSizes = &Ce->ExpSizes;
-     
     file_id FileId = ConstructFilePath(Idx2, *CeIt.Key);
     idx2_Assert(FileId.Id == *CeIt.Key);
     /* write chunk emax sizes */
@@ -151,15 +184,44 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
     // write the total number of bytes used for storing the exponents
     TotalExpBytes += sizeof(int);
     WritePOD(Fp, (int)TotalExpBytes);
-#endif
-
     Dealloc(&CeIt.Val->FileExpBuffer);
   }
 
   return idx2_Error(idx2_err_code::NoError);
 }
+#endif
 
 
+#if VISUS_IDX2 // write each chunk to a file
+void
+WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subband, i16 BitPlane)
+{
+  BrickDeltasStat.Add((f64)Size(C->BrickDeltasStream)); // brick deltas
+  BrickSzsStat.Add((f64)Size(C->BrickSizeStream));       // brick sizes
+  BrickStreamStat.Add((f64)Size(C->BrickStream));       // brick data
+  i64 ChunkSize = Size(C->BrickDeltasStream) + Size(C->BrickSizeStream) + Size(C->BrickStream) + 64;
+  Rewind(&E->ChunkStream);
+  GrowToAccomodate(&E->ChunkStream, ChunkSize);
+  WriteVarByte(&E->ChunkStream, C->NBricks);
+  WriteStream(&E->ChunkStream, &C->BrickDeltasStream);
+  WriteStream(&E->ChunkStream, &C->BrickSizeStream);
+  WriteStream(&E->ChunkStream, &C->BrickStream);
+  Flush(&E->ChunkStream);
+  ChunkStreamStat.Add((f64)Size(E->ChunkStream));
+
+  /* we are done with these, rewind */
+  Rewind(&C->BrickDeltasStream);
+  Rewind(&C->BrickSizeStream);
+  Rewind(&C->BrickStream);
+
+  u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
+  buffer Buf = ToBuffer(E->ChunkStream);
+  //std::cout << "Writing chunk " << ChunkAddress << " size=" <<Size(Buf) << std::endl;
+  WriteBufferToFileAtAddress(Idx2, ChunkAddress, Buf);
+
+  Rewind(&E->ChunkStream);
+}
+#else // default mode
 // TODO: return error
 void
 WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subband, i16 BitPlane)
@@ -182,15 +244,6 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
   Rewind(&C->BrickSizeStream);
   Rewind(&C->BrickStream);
 
- #if VISUS_IDX2 && 0 // write chunk
-  std::string Key = cstring(GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane));
-  buffer Buf = ToBuffer(E->ChunkStream);
-  std::cout << "Writing chunk " << Key << " size=" <<Size(Buf) << std::endl;
-  std::ofstream out(Key.c_str(), std::ofstream::out);
-  out.write((const char*)Buf.Data, Size(Buf));
-  out.close();
-#else
-
   /* write to file */
   file_id FileId = ConstructFilePath(Idx2, C->LastBrick, Level, Subband, BitPlane);
   idx2_OpenMaybeExistingFile(Fp, FileId.Name.ConstPtr, "ab");
@@ -211,11 +264,32 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
   u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
   PushBack(&ChunkMeta->Addrs, ChunkAddress);
   Rewind(&E->ChunkStream);
-
-#endif
 }
+#endif
 
 
+#if VISUS_IDX2 // write each chunk to a file
+error<idx2_err_code>
+FlushChunks(const idx2_file& Idx2, encode_data* E)
+{
+  Reserve(&E->SortedChannels, Size(E->Channels));
+  Clear(&E->SortedChannels);
+  idx2_ForEach (Ch, E->Channels)
+  {
+    PushBack(&E->SortedChannels, t2<u32, channel*>{ *Ch.Key, Ch.Val });
+  }
+  InsertionSort(Begin(E->SortedChannels), End(E->SortedChannels));
+  idx2_ForEach (Ch, E->SortedChannels)
+  {
+    i8 Level = GetLevelFromChannelKey(Ch->First);
+    i8 Subband = GetSubbandFromChannelKey(Ch->First);
+    i16 BitPlane = BitPlaneFromChannelKey(Ch->First);
+    //printf("key %llu level %d subband %d bitplane %d\n", Ch->First, Level, Subband, BitPlane);
+    WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane);
+  }
+  return idx2_Error(idx2_err_code::NoError);
+}
+#else // default mode
 // TODO: check the error path
 error<idx2_err_code>
 FlushChunks(const idx2_file& Idx2, encode_data* E)
@@ -235,9 +309,6 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
     //printf("key %llu level %d subband %d bitplane %d\n", Ch->First, Level, Subband, BitPlane);
     WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane);
   }
-#if VISUS_IDX2 && 0 // no need to write chunk metadata
-  ; //is it right to not do anything?
-#else
   /* write the chunk meta */
   idx2_ForEach (CmIt, E->ChunkMeta)
   {
@@ -264,9 +335,9 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
     ChunkAddrsStat.Add((f64)Size(Cm->Addrs) * sizeof(Cm->Addrs[0]));
     CpresChunkAddrsStat.Add((f64)Size(E->CompressedChunkAddresses));
   }
-#endif
   return idx2_Error(idx2_err_code::NoError);
 }
+#endif
 
 
 void
