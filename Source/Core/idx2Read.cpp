@@ -18,21 +18,16 @@ namespace idx2
 {
 
 
-static std::string cstring(u64 value)
+static buffer // TODO: return an error
+ReadBufferFromFileAtAddress(const idx2_file& Idx2, u64 Address)
 {
-  std::ostringstream out;
-  out << value;
-  return out.str();
+  thread_local static char FilePath[256];
+  printer Pr(FilePath, sizeof(FilePath));
+  idx2_Print(&Pr, "%.*s/%s/%s/%" PRIi64, Idx2.Dir.Size, Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field, Address);
+  buffer Buf;
+  ReadFile(FilePath, &Buf);
+  return Buf;
 }
-
-static std::string ReafFile(const std::string& path)
-{
-  std::ostringstream buf;
-  std::ifstream input(path.c_str());
-  buf << input.rdbuf();
-  return buf.str();
-}
-
 
 
 static void
@@ -75,12 +70,16 @@ DeallocFileCacheTable(file_cache_table* FileCacheTable)
 
 
 /* Given a brick address, open the file associated with the brick and cache its chunk information */
+#if VISUS_IDX2
 static error<idx2_err_code>
 ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id& FileId)
 {
-#if VISUS_IDX2 && 0 //no need to read metadata
-  return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
+  return idx2_Error(idx2_err_code::NoError);
+}
 #else
+static error<idx2_err_code>
+ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id& FileId)
+{
 
   timer IOTimer;
   StartTimer(&IOTimer);
@@ -140,34 +139,59 @@ ReadFile(decode_data* D, file_cache_table::iterator* FileCacheIt, const file_id&
   }
   idx2_Assert(Size(D->ChunkSizeStream) == ChunkSizesSz);
 
-  if (!*FileCacheIt)
-  {
+  if (!*FileCacheIt) // the file cache does not exist
+  { // insert a new file cache
     Insert(FileCacheIt, FileId.Id, FileCache);
   }
-  else
-  {
+  else // the file cache exists
+  { // modify the chunk caches portion of the file cache
+    idx2_Assert(IsEmpty(FileCacheIt->Val->ChunkCaches));
     FileCacheIt->Val->ChunkCaches = FileCache.ChunkCaches;
     FileCacheIt->Val->ChunkOffsets = FileCache.ChunkOffsets;
   }
   FileCacheIt->Val->DataCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
-#endif
 }
+#endif
 
 
 /* Given a brick address, read the chunk associated with the brick and cache the chunk */
+#if VISUS_IDX2
 expected<const chunk_cache*, idx2_err_code>
 ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
 {
-#if VISUS_IDX2 && 0 //read chunk
+  file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
+  auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
+  if (!FileCacheIt)
+  {
+    file_cache FileCache;
+    Init(&FileCache.ChunkExpCaches, 10);
+    Init(&FileCache.ChunkCaches, 10);
+    Insert(&FileCacheIt, FileId.Id, FileCache);
+  }
+  file_cache* FileCache = FileCacheIt.Val;
+  u64 ChunkAddress = GetChunkAddress(Idx2, Brick, Level, Subband, BitPlane);
+  auto ChunkCacheIt = Lookup(&FileCache->ChunkCaches, ChunkAddress);
+  if (ChunkCacheIt)
+    return ChunkCacheIt.Val;
 
-  std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, BitPlane));
-  std::string buffer = ReafFile(Key);
-  //TODO: how to return the results?
-  return idx2_Error(idx2_err_code::ChunkNotFound);
+  chunk_cache ChunkCache;
+  bitstream ChunkStream;
+  ChunkStream.Stream = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
+  //InitRead(&ChunkCache.ChunkStream, ChunkBuf);
+  DecompressChunk(&ChunkStream,
+                  &ChunkCache,
+                  ChunkAddress,
+                  Log2Ceil(Idx2.BricksPerChunk[Level]));
+  Insert(&ChunkCacheIt, ChunkAddress, ChunkCache);
 
+  return ChunkCacheIt.Val;
+}
 #else
+expected<const chunk_cache*, idx2_err_code>
+ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
+{
 
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
@@ -207,11 +231,12 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
   }
 
   return ChunkCacheIt.Val;
-#endif
 }
+#endif
 
 
 /* Read and decode the sizes of the compressed exponent chunks in a file */
+#if VISUS_IDX2
 static error<idx2_err_code>
 ReadFileExponents(const idx2_file& Idx2,
                   decode_data* D,
@@ -219,9 +244,16 @@ ReadFileExponents(const idx2_file& Idx2,
                   file_cache_table::iterator* FileCacheIt,
                   const file_id& FileId)
 {
-#if VISUS_IDX2 && 0 // no need to read exponent metadata
-  return idx2_Error(idx2_err_code::NoError); //is it right to not do anything?
+  return idx2_Error(idx2_err_code::NoError);
+}
 #else
+static error<idx2_err_code>
+ReadFileExponents(const idx2_file& Idx2,
+                  decode_data* D,
+                  i8 Level,
+                  file_cache_table::iterator* FileCacheIt,
+                  const file_id& FileId)
+{
   timer IOTimer;
   StartTimer(&IOTimer);
 
@@ -290,12 +322,13 @@ ReadFileExponents(const idx2_file& Idx2,
   //Resize(&FileCache.ChunkCaches, Size(FileCache.ChunkExpOffsets));
   idx2_Assert(Size(D->ChunkExpSizeStream) == S);
 
-  if (!*FileCacheIt)
+  if (!*FileCacheIt) // file cache exists
   {
     Insert(FileCacheIt, FileId.Id, FileCache);
   }
-  else
+  else // file cache does not exist
   {
+    idx2_Assert(IsEmpty(FileCacheIt->Val->ChunkExpCaches));
     FileCacheIt->Val->ExponentBeginOffset = FileCache.ExponentBeginOffset;
     FileCacheIt->Val->ChunkExpOffsets = FileCache.ChunkExpOffsets;
     FileCacheIt->Val->ChunkExpCaches = FileCache.ChunkExpCaches;
@@ -303,22 +336,45 @@ ReadFileExponents(const idx2_file& Idx2,
   FileCacheIt->Val->ExpCached = true;
 
   return idx2_Error(idx2_err_code::NoError);
-#endif
 }
+#endif
 
 
 /* Given a brick address, read the exponent chunk associated with the brick and cache it */
 // TODO: remove the last two params (already stored in D)
+#if VISUS_IDX2 // read chunk exponent
 expected<const chunk_exp_cache*, idx2_err_code>
 ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
 {
-#if VISUS_IDX2 && 0 // read chunk exponent
-  std::string Key = cstring(GetChunkAddress(Idx2, Brick, Level, Subband, ExponentBitPlane_));
-  std::string buffer = ReafFile(Key);
-  // TODO: how to return the results?
-  return idx2_Error(idx2_err_code::ChunkNotFound);
+  file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
+  auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
+  if (!FileCacheIt)
+  {
+    file_cache FileCache;
+    Init(&FileCache.ChunkExpCaches, 10);
+    Init(&FileCache.ChunkCaches, 10);
+    Insert(&FileCacheIt, FileId.Id, FileCache);
+  }
+  file_cache* FileCache = FileCacheIt.Val;
+  u64 ChunkAddress = GetChunkAddress(Idx2, Brick, Level, Subband, ExponentBitPlane_);
+  auto ChunkExpCacheIt = Lookup(&FileCache->ChunkExpCaches, ChunkAddress);
+  if (ChunkExpCacheIt)
+    return ChunkExpCacheIt.Val;
 
+  chunk_exp_cache ChunkExpCache;
+  buffer ChunkExpBuf = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
+  bitstream& ChunkExpStream = ChunkExpCache.ChunkExpStream;
+  D->CompressedChunkExps = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
+  DecompressBufZstd(D->CompressedChunkExps, &ChunkExpStream);
+  InitRead(&ChunkExpCache.ChunkExpStream, ChunkExpStream.Stream);
+  Insert(&ChunkExpCacheIt, ChunkAddress, ChunkExpCache);
+
+  return ChunkExpCacheIt.Val;
+}
 #else
+expected<const chunk_exp_cache*, idx2_err_code>
+ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
+{
 
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
@@ -364,10 +420,8 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
   }
 
   return ChunkCacheIt.Val;
-
-#endif
-
 }
+#endif
 
 
 } // namespace idx2

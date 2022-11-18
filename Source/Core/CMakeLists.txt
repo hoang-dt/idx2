@@ -85,7 +85,7 @@ set_target_properties(idx2Core PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   PUBLIC_HEADER "${IDX2_CORE_HEADER_FILES}")
 target_compile_features(idx2Core PUBLIC cxx_std_17)
-target_compile_definitions(idx2Core PUBLIC -Didx2_Avx2)
+target_compile_definitions(idx2Core PUBLIC -Didx2_Avx2 -DVISUS_IDX2)
 target_compile_definitions(idx2Core PUBLIC "$<$<CONFIG:DEBUG>:idx2_Slow>")
 
 if (MSVC)
