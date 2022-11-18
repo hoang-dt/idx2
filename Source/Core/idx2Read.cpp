@@ -7,11 +7,6 @@
 #include "idx2Lookup.h"
 #include "idx2Read.h"
 #include "idx2Decode.h"
-
-
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #include <string>
 
 namespace idx2

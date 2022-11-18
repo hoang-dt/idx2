@@ -5,7 +5,6 @@
 #include "FileSystem.h"
 #include "Statistics.h"
 #include "VarInt.h"
-
 #include <string>
 
 namespace idx2
