@@ -152,6 +152,14 @@ SetDownsamplingFactor(idx2_file* Idx2, const v3i& DownsamplingFactor3)
   Idx2->DownsamplingFactor3 = DownsamplingFactor3;
 }
 
+#if VISUS_IDX2
+void
+SetExternalAccess(idx2_file* Idx2, bool ExternalAccess)
+{
+  Idx2->ExternalAccess = ExternalAccess;
+}
+#endif
+
 
 /* Write the metadata file (idx) */
 // TODO: return error type

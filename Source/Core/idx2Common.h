@@ -107,6 +107,10 @@ struct params
   v3<i64> Strides3 = v3<i64>(0);
   i64 Offset = -1; // this can be used to specify the "depth"
   i64 NSamplesInFile = 0;
+
+#if VISUS_IDX2
+  bool ExternalAccess = false;
+#endif
 };
 
 
@@ -176,6 +180,10 @@ struct idx2_file
   bool GroupLevels = false;
   bool GroupBitPlanes = true;
   bool GroupSubbands = true;
+
+#if VISUS_IDX2
+  bool ExternalAccess = false;
+#endif
 };
 
 
@@ -260,6 +268,11 @@ SetGroupBitPlanes(idx2_file* Idx2, bool GroupBitPlanes);
 
 void
 SetDownsamplingFactor(idx2_file* Idx2, const v3i& DownsamplingFactor3);
+
+#if VISUS_IDX2
+void
+SetExternalAccess(idx2_file* Idx2, bool ExternalAccess);
+#endif
 
 error<idx2_err_code>
 Finalize(idx2_file* Idx2, const params& P);

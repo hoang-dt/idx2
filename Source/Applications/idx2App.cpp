@@ -232,6 +232,12 @@ ParseParams(int Argc, cstr* Argv)
   else if (P.Action == action::Decode)
     ParseDecodeOptions(Argc, Argv, &P);
 
+#if VISUS_IDX2
+  P.ExternalAccess = 
+    OptExists(Argc, Argv, "--external_access") || 
+    OptExists(Argc, Argv, "--external-access");
+#endif
+
   return P;
 }
 
@@ -255,7 +261,6 @@ SetParams(idx2_file* Idx2, const params& P)
   SetGroupLevels(Idx2, P.GroupLevels);
   SetGroupBitPlanes(Idx2, P.GroupBitPlanes);
   SetGroupSubLevels(Idx2, P.GroupSubLevels);
-
   return Finalize(Idx2, P);
 }
 
@@ -275,6 +280,11 @@ main(int Argc, cstr* Argv)
 
   /* Perform the action */
   idx2_RAII(idx2_file, Idx2);
+
+#if VISUS_IDX2
+  printf("ExternalAccess=%d\n", (int)P.ExternalAccess);
+  SetExternalAccess(&Idx2, P.ExternalAccess);
+#endif
 
   if (P.Action == action::Encode)
   {
