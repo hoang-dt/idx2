@@ -9,6 +9,10 @@ namespace idx2
 error<idx2_err_code>
 Init(idx2_file* Idx2, params& P)
 {
+#if VISUS_IDX2
+  SetExternalAccess(Idx2, P.ExternalAccess);
+#endif
+
   SetDir(Idx2, P.InDir);
   SetDownsamplingFactor(Idx2, P.DownsamplingFactor3);
   idx2_PropagateIfError(ReadMetaFile(Idx2, idx2_PrintScratch("%s", P.InputFile)));
