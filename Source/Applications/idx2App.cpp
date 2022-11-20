@@ -229,9 +229,9 @@ ParseParams(int Argc, cstr* Argv)
     ParseDecodeOptions(Argc, Argv, &P);
 
 #if VISUS_IDX2
-  P.ExternalAccess = 
-    OptExists(Argc, Argv, "--external_access") || 
-    OptExists(Argc, Argv, "--external-access");
+  P.enable_visus = 
+    OptExists(Argc, Argv, "--enable_visus") || 
+    OptExists(Argc, Argv, "--enable-visus");
 #endif
 
   return P;
@@ -276,8 +276,8 @@ Idx2App(int Argc, const char* Argv[])
   idx2_RAII(idx2_file, Idx2);
 
 #if VISUS_IDX2
-  printf("ExternalAccess=%d\n", (int)P.ExternalAccess);
-  SetExternalAccess(&Idx2, P.ExternalAccess);
+  if (P.enable_visus)
+    EnableVisus(&Idx2);
 #endif
 
   if (P.Action == action::Encode)

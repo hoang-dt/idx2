@@ -32,6 +32,7 @@ WriteBufferToFileAtAddress(const idx2_file& Idx2, u64 Address, const buffer& Buf
   thread_local static char FilePath[256];
   printer Pr(FilePath, sizeof(FilePath));
   idx2_Print(&Pr, "%.*s/%s/%s/%" PRIi64, Idx2.Dir.Size, Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field, Address);
+  CreateFullDir(GetParentPath(FilePath));
   WriteBuffer(FilePath, Buf);
 }
 
@@ -40,7 +41,7 @@ void
 WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 Level, i8 Subband)
 {
 #if VISUS_IDX2 // WriteChunkExponents
-  if (Idx2.ExternalAccess){
+  if (Idx2.visus.enabled){
     /* brick exponents */
     Flush(&Sc->BrickExpStream);
     BrickEMaxesStat.Add((f64)Size(Sc->BrickExpStream));
@@ -54,8 +55,8 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
     u64 ChunkExpAddress = GetChunkAddress(Idx2, Sc->LastBrick, Level, Subband, ExponentBitPlane_);
     buffer Buf = ToBuffer(E->ChunkExpStream);
     WriteBufferToFileAtAddress(Idx2, ChunkExpAddress, Buf);
-    // std::cout << "Writing exponent " << ChunkExpAddress << " size=" <<Size(Buf) << std::endl;
     Rewind(&E->ChunkExpStream);
+    return;
   }
 #endif
 
@@ -105,7 +106,7 @@ error<idx2_err_code>
 FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
 {
 #if VISUS_IDX2 // FlushChunkExponents
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
   {
     Reserve(&E->SortedSubChannels, Size(E->SubChannels));
     Clear(&E->SortedSubChannels);
@@ -191,7 +192,7 @@ void
 WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subband, i16 BitPlane)
 {
 #if VISUS_IDX2 // WriteChunk
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
   {
     BrickDeltasStat.Add((f64)Size(C->BrickDeltasStream)); // brick deltas
     BrickSzsStat.Add((f64)Size(C->BrickSizeStream));      // brick sizes
@@ -214,10 +215,10 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
 
     u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
     buffer Buf = ToBuffer(E->ChunkStream);
-    // std::cout << "Writing chunk " << ChunkAddress << " size=" <<Size(Buf) << std::endl;
     WriteBufferToFileAtAddress(Idx2, ChunkAddress, Buf);
 
     Rewind(&E->ChunkStream);
+    return;
   }
 #endif
 
@@ -267,7 +268,7 @@ error<idx2_err_code>
 FlushChunks(const idx2_file& Idx2, encode_data* E)
 {
 #if VISUS_IDX2 // FlushChunks
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
   {
     Reserve(&E->SortedChannels, Size(E->Channels));
     Clear(&E->SortedChannels);
@@ -331,7 +332,6 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
   }
   return idx2_Error(idx2_err_code::NoError);
 }
-
 
 void
 PrintStats()

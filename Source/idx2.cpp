@@ -10,7 +10,8 @@ error<idx2_err_code>
 Init(idx2_file* Idx2, params& P)
 {
 #if VISUS_IDX2
-  SetExternalAccess(Idx2, P.ExternalAccess);
+  if (P.enable_visus)
+    EnableVisus(Idx2);
 #endif
 
   SetDir(Idx2, P.InDir);

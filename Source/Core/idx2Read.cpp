@@ -72,7 +72,7 @@ ReadFile(const idx2_file& Idx2,
          const file_id& FileId)
 {
 #if VISUS_IDX2 // NOP
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
     return idx2_Error(idx2_err_code::NoError);
 #endif
 
@@ -155,7 +155,7 @@ expected<const chunk_cache*, idx2_err_code>
 ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
 {
 #if VISUS_IDX2 // ReadChunk
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
   {
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
     auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
@@ -233,10 +233,8 @@ ReadFileExponents(const idx2_file& Idx2,
                   const file_id& FileId)
 {
 #if VISUS_IDX2 //NOP
-  if (Idx2.ExternalAccess)
-  {
+  if (Idx2.visus.enabled)
     return idx2_Error(idx2_err_code::NoError);
-  }
 #endif
 
   timer IOTimer;
@@ -330,7 +328,7 @@ expected<const chunk_exp_cache*, idx2_err_code>
 ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
 {
 #if VISUS_IDX2 // ReadChunkExponents
-  if (Idx2.ExternalAccess)
+  if (Idx2.visus.enabled)
   {
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
     auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
@@ -353,7 +351,6 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
     DecompressBufZstd(D->CompressedChunkExps, &ChunkExpStream);
     InitRead(&ChunkExpCache.ChunkExpStream, ChunkExpStream.Stream);
     Insert(&ChunkExpCacheIt, ChunkAddress, ChunkExpCache);
-
     return ChunkExpCacheIt.Val;
   }
 #endif

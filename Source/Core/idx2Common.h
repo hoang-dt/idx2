@@ -1,5 +1,11 @@
 #pragma once
 
+#if VISUS_IDX2
+#include <Visus/Db.h>
+#include <Visus/Dataset.h>
+#include <Visus/Access.h>
+#endif
+
 #include "Array.h"
 #include "BitStream.h"
 #include "Common.h"
@@ -109,7 +115,7 @@ struct params
   i64 NSamplesInFile = 0;
 
 #if VISUS_IDX2
-  bool ExternalAccess = false;
+  bool enable_visus = false;
 #endif
 };
 
@@ -182,7 +188,13 @@ struct idx2_file
   bool GroupSubbands = true;
 
 #if VISUS_IDX2
-  bool ExternalAccess = false;
+  struct
+  {
+    bool enabled = false;
+    Visus::SharedPtr<Visus::Dataset> dataset;
+    Visus::SharedPtr<Visus::Access>  access;
+  }
+  visus;
 #endif
 };
 
@@ -271,7 +283,7 @@ SetDownsamplingFactor(idx2_file* Idx2, const v3i& DownsamplingFactor3);
 
 #if VISUS_IDX2
 void
-SetExternalAccess(idx2_file* Idx2, bool ExternalAccess);
+EnableVisus(idx2_file* Idx2);
 #endif
 
 error<idx2_err_code>
