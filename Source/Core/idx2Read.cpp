@@ -9,21 +9,10 @@
 #include "idx2Decode.h"
 #include <string>
 
+
+
 namespace idx2
 {
-
-
-static buffer // TODO: return an error
-ReadBufferFromFileAtAddress(const idx2_file& Idx2, u64 Address)
-{
-  thread_local static char FilePath[256];
-  printer Pr(FilePath, sizeof(FilePath));
-  idx2_Print(&Pr, "%.*s/%s/%s/%" PRIi64, Idx2.Dir.Size, Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field, Address);
-  buffer Buf;
-  ReadFile(FilePath, &Buf);
-  return Buf;
-}
-
 
 static void
 Dealloc(chunk_cache* ChunkCache)
@@ -172,9 +161,17 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
     if (ChunkCacheIt)
       return ChunkCacheIt.Val;
 
+    std::ostringstream filename;
+    filename << std::string(Idx2.Dir.Ptr, Idx2.Dir.Size) << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
+    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
+    buffer buff;
+    AllocBuf(&buff, heap->c_size());
+    memcpy(buff.Data, heap->c_ptr(), heap->c_size());
+
     chunk_cache ChunkCache;
     bitstream ChunkStream;
-    ChunkStream.Stream = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
+    ChunkStream.Stream=buff;
+
     // InitRead(&ChunkCache.ChunkStream, ChunkBuf);
     DecompressChunk(&ChunkStream, &ChunkCache, ChunkAddress, Log2Ceil(Idx2.BricksPerChunk[Level]));
     Insert(&ChunkCacheIt, ChunkAddress, ChunkCache);
@@ -345,9 +342,16 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
     if (ChunkExpCacheIt)
       return ChunkExpCacheIt.Val;
 
+    std::ostringstream filename;
+    filename << std::string(Idx2.Dir.Ptr, Idx2.Dir.Size) << "/" << Idx2.Name << "/" << Idx2.Field  << "/" << ChunkAddress;
+    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
+    buffer buff;
+    AllocBuf(&buff, heap->c_size());
+    memcpy(buff.Data, heap->c_ptr(), heap->c_size());
+
     chunk_exp_cache ChunkExpCache;
     bitstream& ChunkExpStream = ChunkExpCache.ChunkExpStream;
-    D->CompressedChunkExps = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
+    D->CompressedChunkExps = buff;
     DecompressBufZstd(D->CompressedChunkExps, &ChunkExpStream);
     InitRead(&ChunkExpCache.ChunkExpStream, ChunkExpStream.Stream);
     Insert(&ChunkExpCacheIt, ChunkAddress, ChunkExpCache);
