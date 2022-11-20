@@ -1,14 +1,10 @@
-//#define _CRTDBG_MAP_ALLOC
-//#include <stdlib.h>
-//#include <crtdbg.h>
+#if VISUS_IDX2
+#include <Visus/Db.h>
+#endif
 
-//#define idx2_Implementation
-//#include "../idx2.hpp"
 #include "../idx2.h"
 
-
 using namespace idx2;
-
 
 /* Parse the decode options */
 static void
@@ -264,10 +260,8 @@ SetParams(idx2_file* Idx2, const params& P)
   return Finalize(Idx2, P);
 }
 
-
-/* Main function (entry point of the idx2 command) */
-int
-main(int Argc, cstr* Argv)
+int 
+Idx2App(int Argc, const char* Argv[])
 {
   SetHandleAbortSignals();
 
@@ -318,3 +312,14 @@ main(int Argc, cstr* Argv)
   //_CrtDumpMemoryLeaks();
   return 0;
 }
+
+
+#if VISUS_IDX2
+  // visus will have a different entry point
+#else
+  int
+  main(int Argc, const char* Argv[])
+  {
+    return Idx2App(Argc, Argv);
+  }
+#endif

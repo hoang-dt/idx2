@@ -18,8 +18,7 @@ The optional dependencies are only needed if `BUILD_IDX2PY` is set to `ON` in CM
 
 # Using the `idx2App` command line tool to encode raw to idx2
 ```
-idx2App --encode Miranda-Viscosity-[384-384-256]-Float64.raw --tolerance 1e-16 --num_levels 2 --out_dir . 
-# add optional `--external_access` for OpenVisus 
+idx2App --encode Miranda-Viscosity-[384-384-256]-Float64.raw --tolerance 1e-16 --num_levels 2 --out_dir .  
 ```
 
 For convenience, the dimensions of the input are automatically parsed if the input file is named in the `Name-Field-[DimX-DimY-DimZ]-Type.raw` format.
@@ -32,19 +31,11 @@ The outputs will be multiple files written to the `out_dir/Name` directory, and 
 # Using the `idx2App` command line tool to decode idx2 to raw
 ```
 idx2App --decode Miranda/Viscosity.idx2 --downsampling 1 1 1 --tolerance 0.001 
-# # add optional `--external_access` for OpenVisus
 ```
 
 `--downsampling` specifies the desired downsampling passes along each axis (each pass halves the number of samples along an axis), and `--tolerance` to specify the desired absolute error tolerance.
 <!-- The output will be written to a raw file in the current directory. -->
 Optionally, use `--first x_begin y_begin z_begin` and `--last x_end y_end z_end` (the end points are inclusive) to specify the region of interest instead of decoding the whole field.
-
-# Use python to convert the raw file to images
-
-```
-python Source/Applications/idx2_convert.py Miranda-Viscosity-[193-193-129]-float64-accuracy-0.001000.raw
-# it will produce one png for each slice, remapping to [0,1] range
-```
 
 # Using the C++ API to read from an idx2 dataset to memory
 
