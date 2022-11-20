@@ -26,22 +26,13 @@ static stat ChunkAddrsStat;
 static stat ChunkSzsStat;
 
 
-static void // TODO: return an error
-WriteBufferToFileAtAddress(const idx2_file& Idx2, u64 Address, const buffer& Buf)
-{
-  thread_local static char FilePath[256];
-  printer Pr(FilePath, sizeof(FilePath));
-  idx2_Print(&Pr, "%.*s/%s/%s/%" PRIi64, Idx2.Dir.Size, Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field, Address);
-  CreateFullDir(GetParentPath(FilePath));
-  WriteBuffer(FilePath, Buf);
-}
-
 
 void
 WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 Level, i8 Subband)
 {
 #if VISUS_IDX2 // WriteChunkExponents
   if (Idx2.visus.enabled){
+
     /* brick exponents */
     Flush(&Sc->BrickExpStream);
     BrickEMaxesStat.Add((f64)Size(Sc->BrickExpStream));
@@ -49,12 +40,16 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
     CompressBufZstd(ToBuffer(Sc->BrickExpStream), &E->ChunkExpStream);
     //  PushBack(&E->FileEMaxBuffer, E->ChunkEMaxesStream.Stream.Data, Size(E->ChunkEMaxesStream));
     ChunkEMaxesStat.Add((f64)Size(E->ChunkExpStream));
-
-    /* rewind */
     Rewind(&Sc->BrickExpStream);
     u64 ChunkExpAddress = GetChunkAddress(Idx2, Sc->LastBrick, Level, Subband, ExponentBitPlane_);
     buffer Buf = ToBuffer(E->ChunkExpStream);
-    WriteBufferToFileAtAddress(Idx2, ChunkExpAddress, Buf);
+
+    //write to local storage or trhe cloud
+    std::ostringstream filename;
+    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
+    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkExpAddress;
+    Visus::Utils::saveBinaryDocument(filename.str(),Visus::HeapMemory::createUnmanaged(Buf.Data,Buf.Bytes));
+
     Rewind(&E->ChunkExpStream);
     return;
   }
@@ -215,7 +210,12 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
 
     u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
     buffer Buf = ToBuffer(E->ChunkStream);
-    WriteBufferToFileAtAddress(Idx2, ChunkAddress, Buf);
+
+    //write to local storage or the cloud
+    std::ostringstream filename;
+    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
+    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
+    Visus::Utils::saveBinaryDocument(filename.str(), Visus::HeapMemory::createUnmanaged(Buf.Data, Buf.Bytes));
 
     Rewind(&E->ChunkStream);
     return;

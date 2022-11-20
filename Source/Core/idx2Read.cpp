@@ -146,6 +146,7 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
 #if VISUS_IDX2 // ReadChunk
   if (Idx2.visus.enabled)
   {
+    //this part handles with caching, in the long-term it should be disabled since OpenVisus can handle the caching itself
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
     auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
     if (!FileCacheIt)
@@ -161,17 +162,19 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
     if (ChunkCacheIt)
       return ChunkCacheIt.Val;
 
+    //load the block from the cloud or from local storage
     std::ostringstream filename;
-    filename << std::string(Idx2.Dir.Ptr, Idx2.Dir.Size) << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
+    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
+    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
     auto heap = Visus::Utils::loadBinaryDocument(filename.str());
     buffer buff;
     AllocBuf(&buff, heap->c_size());
     memcpy(buff.Data, heap->c_ptr(), heap->c_size());
 
+    //decompress part
     chunk_cache ChunkCache;
     bitstream ChunkStream;
     ChunkStream.Stream=buff;
-
     // InitRead(&ChunkCache.ChunkStream, ChunkBuf);
     DecompressChunk(&ChunkStream, &ChunkCache, ChunkAddress, Log2Ceil(Idx2.BricksPerChunk[Level]));
     Insert(&ChunkCacheIt, ChunkAddress, ChunkCache);
@@ -327,6 +330,7 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
 #if VISUS_IDX2 // ReadChunkExponents
   if (Idx2.visus.enabled)
   {
+    //this part handles with caching, in the long-term it should be disabled since OpenVisus can handle the caching itself
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
     auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
     if (!FileCacheIt)
@@ -342,13 +346,16 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
     if (ChunkExpCacheIt)
       return ChunkExpCacheIt.Val;
 
+    //read the block
     std::ostringstream filename;
-    filename << std::string(Idx2.Dir.Ptr, Idx2.Dir.Size) << "/" << Idx2.Name << "/" << Idx2.Field  << "/" << ChunkAddress;
+    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
+    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
     auto heap = Visus::Utils::loadBinaryDocument(filename.str());
     buffer buff;
     AllocBuf(&buff, heap->c_size());
     memcpy(buff.Data, heap->c_ptr(), heap->c_size());
 
+    //decompress the block 
     chunk_exp_cache ChunkExpCache;
     bitstream& ChunkExpStream = ChunkExpCache.ChunkExpStream;
     D->CompressedChunkExps = buff;
