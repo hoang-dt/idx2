@@ -72,7 +72,7 @@ ReadFile(const idx2_file& Idx2,
          const file_id& FileId)
 {
 #if VISUS_IDX2 // NOP
-  if (Idx2.ExternalAccess) 
+  if (Idx2.ExternalAccess)
     return idx2_Error(idx2_err_code::NoError);
 #endif
 
@@ -179,7 +179,7 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
     DecompressChunk(&ChunkStream, &ChunkCache, ChunkAddress, Log2Ceil(Idx2.BricksPerChunk[Level]));
     Insert(&ChunkCacheIt, ChunkAddress, ChunkCache);
 
-    return ChunkCacheIt.Val;    
+    return ChunkCacheIt.Val;
   }
 #endif
 
@@ -235,7 +235,7 @@ ReadFileExponents(const idx2_file& Idx2,
 #if VISUS_IDX2 //NOP
   if (Idx2.ExternalAccess)
   {
-    return idx2_Error(idx2_err_code::NoError); 
+    return idx2_Error(idx2_err_code::NoError);
   }
 #endif
 
@@ -348,7 +348,6 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
       return ChunkExpCacheIt.Val;
 
     chunk_exp_cache ChunkExpCache;
-    buffer ChunkExpBuf = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
     bitstream& ChunkExpStream = ChunkExpCache.ChunkExpStream;
     D->CompressedChunkExps = ReadBufferFromFileAtAddress(Idx2, ChunkAddress);
     DecompressBufZstd(D->CompressedChunkExps, &ChunkExpStream);
