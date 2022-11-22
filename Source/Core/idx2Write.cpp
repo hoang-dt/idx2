@@ -46,15 +46,7 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
     Rewind(&Sc->BrickExpStream);
     u64 ChunkExpAddress = GetChunkAddress(Idx2, Sc->LastBrick, Level, Subband, ExponentBitPlane_);
     buffer Buf = ToBuffer(E->ChunkExpStream);
-    
-#if 0
-    // write to local storage or trhe cloud
-    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkExpAddress;
-    Visus::Utils::saveBinaryDocument(filename.str(), Visus::HeapMemory::createUnmanaged(Buf.Data, Buf.Bytes));
-#else
     VisusReleaseAssert(Idx2.external_write(Idx2, Buf, ChunkExpAddress));
-#endif
-    //std::cout << "WriteChunkExponents ChunkExpAddress=" << ChunkExpAddress << " Bytes=" << Buf.Bytes << " bytes=" << (int)Buf.Data[0] << ".." << (int)Buf.Data[Buf.Bytes - 1] << std::endl;
     Rewind(&E->ChunkExpStream);
     return;
   }
@@ -211,13 +203,7 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
 
     u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
     buffer Buf = ToBuffer(E->ChunkStream);
-#if 0
-    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
-    Visus::Utils::saveBinaryDocument(filename.str(), Visus::HeapMemory::createUnmanaged(Buf.Data, Buf.Bytes));
-#else
     VisusReleaseAssert(Idx2.external_write(Idx2, Buf, ChunkAddress));
-#endif
-    // std::cout << "WriteChunk ChunkAddress=" << ChunkAddress << " Bytes=" << Buf.Bytes<< " bytes=" << (int)Buf.Data[0] << ".." << (int)Buf.Data[Buf.Bytes - 1] << std::endl;
     Rewind(&E->ChunkStream);
     return;
   }

@@ -163,18 +163,7 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
       return ChunkCacheIt.Val;
 
     buffer buff;
-#if 0
-    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
-    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
-    AllocBuf(&buff, heap->c_size());
-    memcpy(buff.Data, heap->c_ptr(), heap->c_size());
-#else
     VisusReleaseAssert(Idx2.external_read(Idx2, buff, ChunkAddress));
-#endif
-
-    std::cout << "ReadChunk ChunkAddress=" << ChunkAddress << " #bytes=" << buff.Bytes
-              << " checksum="<< Visus::StringUtils::hexdigest(Visus::StringUtils::md5(std::string((const char*)buff.Data, buff.Bytes)))
-              << std::endl;
 
     //decompress part
     chunk_cache ChunkCache;
@@ -348,18 +337,7 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
 
     //read the block
     buffer buff;
-#if 0
-    std::ostringstream filename;
-    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
-    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
-    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
-    AllocBuf(&buff, heap->c_size());
-    memcpy(buff.Data, heap->c_ptr(), heap->c_size());
-#else
     VisusReleaseAssert(Idx2.external_read(Idx2, buff, ChunkAddress));
-#endif
-    std::cout << "ReadChunkExponents ChunkAddress=" << ChunkAddress << " #bytes=" << buff.Bytes 
-      << " checksum="<< Visus::StringUtils::hexdigest(Visus::StringUtils::md5(std::string((const char*)buff.Data, buff.Bytes)))<< std::endl;
 
     //decompress the block 
     chunk_exp_cache ChunkExpCache;
