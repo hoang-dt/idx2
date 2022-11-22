@@ -1,5 +1,7 @@
 #if VISUS_IDX2
-#include <Visus/Db.h>
+#include <Visus/IdxDataset2.h>
+#include <Visus/File.h>
+#include <Visus/Path.h>
 #endif
 
 #include "../idx2.h"
@@ -228,11 +230,9 @@ ParseParams(int Argc, cstr* Argv)
   else if (P.Action == action::Decode)
     ParseDecodeOptions(Argc, Argv, &P);
 
-#if VISUS_IDX2
   P.enable_visus = 
     OptExists(Argc, Argv, "--enable_visus") || 
     OptExists(Argc, Argv, "--enable-visus");
-#endif
 
   return P;
 }
@@ -275,15 +275,36 @@ Idx2App(int Argc, const char* Argv[])
   /* Perform the action */
   idx2_RAII(idx2_file, Idx2);
 
-#if VISUS_IDX2
-  if (P.enable_visus)
-    EnableVisus(&Idx2);
-#endif
-
   if (P.Action == action::Encode)
   {
     RemoveDir(idx2_PrintScratch("%s/%s", P.OutDir, P.Meta.Name));
     idx2_ExitIfError(SetParams(&Idx2, P));
+
+#if VISUS_IDX2
+    Visus::SharedPtr<Visus::IdxDataset2> dataset;
+    Visus::SharedPtr<Visus::Access> access;
+    if (P.enable_visus)
+    {
+      std::string url = idx2_PrintScratch("%s/%s/%s.idx2", P.OutDir, P.Meta.Name, P.Meta.Field);
+
+      // need to create the file in advance (otherwise I cannot load IdxDataset2)
+      {
+        auto Min = 0.0; std::swap(Idx2.ValueRange.Min,Min);
+        auto Max = 1.0; std::swap(Idx2.ValueRange.Max,Max);
+        Visus::FileUtils::createDirectory(Visus::Path(url).getParent());
+        WriteMetaFile(Idx2, P, url.c_str());
+        std::swap(Idx2.ValueRange.Min, Min);
+        std::swap(Idx2.ValueRange.Max, Max);
+      }
+
+      dataset = std::dynamic_pointer_cast<Visus::IdxDataset2>(Visus::LoadDataset(url));
+      access = dataset->createAccess();
+      access->setWritingMode();
+      dataset->enableExternalWrite(Idx2, access);
+      dataset->enableExternalRead(Idx2, access);
+#endif
+    }
+
     if (Size(P.InputFiles) > 0)
     { // the input contains multiple files
       idx2_ExitIf(true, "File list input not supported at the moment\n");
@@ -300,6 +321,19 @@ Idx2App(int Argc, const char* Argv[])
   else if (P.Action == action::Decode)
   {
     idx2_ExitIfError(Init(&Idx2, P));
+
+#if VISUS_IDX2
+    Visus::SharedPtr<Visus::IdxDataset2> dataset;
+    Visus::SharedPtr<Visus::Access> access;
+    if (P.enable_visus)
+    {
+      std::string url = idx2_PrintScratch("%s%s/%s.idx2", Idx2.Dir.ConstPtr, Idx2.Name, Idx2.Field);
+      dataset = std::dynamic_pointer_cast<Visus::IdxDataset2>(Visus::LoadDataset(url));
+      access = dataset->createAccess();
+      dataset->enableExternalRead(Idx2, access);    
+    }
+#endif
+
     idx2_ExitIfError(Decode(Idx2, P));
   }
 
@@ -313,13 +347,8 @@ Idx2App(int Argc, const char* Argv[])
   return 0;
 }
 
-
-#if VISUS_IDX2
-  // visus will have a different entry point
-#else
-  int
-  main(int Argc, const char* Argv[])
-  {
-    return Idx2App(Argc, Argv);
-  }
+#if !VISUS_IDX2 // visus will have a different entry point
+int main(int Argc, const char* Argv[]) {
+  return Idx2App(Argc, Argv);
+}
 #endif

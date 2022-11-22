@@ -9,6 +9,9 @@
 #include "idx2Decode.h"
 #include <string>
 
+#include <iostream>
+
+#include <Visus/Utils.h>
 
 
 namespace idx2
@@ -60,10 +63,8 @@ ReadFile(const idx2_file& Idx2,
          file_cache_table::iterator* FileCacheIt,
          const file_id& FileId)
 {
-#if VISUS_IDX2 // NOP
-  if (Idx2.visus.enabled)
+  if (Idx2.external_read)
     return idx2_Error(idx2_err_code::NoError);
-#endif
 
   timer IOTimer;
   StartTimer(&IOTimer);
@@ -143,8 +144,7 @@ ReadFile(const idx2_file& Idx2,
 expected<const chunk_cache*, idx2_err_code>
 ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband, i16 BitPlane)
 {
-#if VISUS_IDX2 // ReadChunk
-  if (Idx2.visus.enabled)
+  if (Idx2.external_read)
   {
     //this part handles with caching, in the long-term it should be disabled since OpenVisus can handle the caching itself
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
@@ -162,14 +162,19 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
     if (ChunkCacheIt)
       return ChunkCacheIt.Val;
 
-    //load the block from the cloud or from local storage
-    std::ostringstream filename;
-    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
-    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
-    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
     buffer buff;
+#if 0
+    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
+    auto heap = Visus::Utils::loadBinaryDocument(filename.str());
     AllocBuf(&buff, heap->c_size());
     memcpy(buff.Data, heap->c_ptr(), heap->c_size());
+#else
+    VisusReleaseAssert(Idx2.external_read(Idx2, buff, ChunkAddress));
+#endif
+
+    std::cout << "ReadChunk ChunkAddress=" << ChunkAddress << " #bytes=" << buff.Bytes
+              << " checksum="<< Visus::StringUtils::hexdigest(Visus::StringUtils::md5(std::string((const char*)buff.Data, buff.Bytes)))
+              << std::endl;
 
     //decompress part
     chunk_cache ChunkCache;
@@ -178,10 +183,8 @@ ReadChunk(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband
     // InitRead(&ChunkCache.ChunkStream, ChunkBuf);
     DecompressChunk(&ChunkStream, &ChunkCache, ChunkAddress, Log2Ceil(Idx2.BricksPerChunk[Level]));
     Insert(&ChunkCacheIt, ChunkAddress, ChunkCache);
-
     return ChunkCacheIt.Val;
   }
-#endif
 
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, BitPlane);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);
@@ -232,10 +235,8 @@ ReadFileExponents(const idx2_file& Idx2,
                   file_cache_table::iterator* FileCacheIt,
                   const file_id& FileId)
 {
-#if VISUS_IDX2 //NOP
-  if (Idx2.visus.enabled)
+  if (Idx2.external_read)
     return idx2_Error(idx2_err_code::NoError);
-#endif
 
   timer IOTimer;
   StartTimer(&IOTimer);
@@ -327,8 +328,7 @@ ReadFileExponents(const idx2_file& Idx2,
 expected<const chunk_exp_cache*, idx2_err_code>
 ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i8 Subband)
 {
-#if VISUS_IDX2 // ReadChunkExponents
-  if (Idx2.visus.enabled)
+  if (Idx2.external_read)
   {
     //this part handles with caching, in the long-term it should be disabled since OpenVisus can handle the caching itself
     file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
@@ -347,13 +347,19 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
       return ChunkExpCacheIt.Val;
 
     //read the block
+    buffer buff;
+#if 0
     std::ostringstream filename;
     auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
     filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
     auto heap = Visus::Utils::loadBinaryDocument(filename.str());
-    buffer buff;
     AllocBuf(&buff, heap->c_size());
     memcpy(buff.Data, heap->c_ptr(), heap->c_size());
+#else
+    VisusReleaseAssert(Idx2.external_read(Idx2, buff, ChunkAddress));
+#endif
+    std::cout << "ReadChunkExponents ChunkAddress=" << ChunkAddress << " #bytes=" << buff.Bytes 
+      << " checksum="<< Visus::StringUtils::hexdigest(Visus::StringUtils::md5(std::string((const char*)buff.Data, buff.Bytes)))<< std::endl;
 
     //decompress the block 
     chunk_exp_cache ChunkExpCache;
@@ -364,7 +370,6 @@ ReadChunkExponents(const idx2_file& Idx2, decode_data* D, u64 Brick, i8 Level, i
     Insert(&ChunkExpCacheIt, ChunkAddress, ChunkExpCache);
     return ChunkExpCacheIt.Val;
   }
-#endif
 
   file_id FileId = ConstructFilePath(Idx2, Brick, Level, Subband, ExponentBitPlane_);
   auto FileCacheIt = Lookup(&D->FileCacheTable, FileId.Id);

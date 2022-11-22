@@ -1,11 +1,5 @@
 #pragma once
 
-#if VISUS_IDX2
-#include <Visus/Db.h>
-#include <Visus/Dataset.h>
-#include <Visus/Access.h>
-#endif
-
 #include "Array.h"
 #include "BitStream.h"
 #include "Common.h"
@@ -15,6 +9,8 @@
 #include "Memory.h"
 #include "Volume.h"
 #include "Wavelet.h"
+
+#include <functional>
 
 
 /* ---------------------- MACROS ----------------------*/
@@ -114,9 +110,7 @@ struct params
   i64 Offset = -1; // this can be used to specify the "depth"
   i64 NSamplesInFile = 0;
 
-#if VISUS_IDX2
   bool enable_visus = false;
-#endif
 };
 
 
@@ -187,15 +181,8 @@ struct idx2_file
   bool GroupBitPlanes = true;
   bool GroupSubbands = true;
 
-#if VISUS_IDX2
-  struct
-  {
-    bool enabled = false;
-    Visus::SharedPtr<Visus::Dataset> dataset;
-    Visus::SharedPtr<Visus::Access>  access;
-  }
-  visus;
-#endif
+  std::function<bool(const idx2_file&, buffer&, u64)> external_read;
+  std::function<bool(const idx2_file&, buffer&, u64)> external_write;
 };
 
 
@@ -219,6 +206,9 @@ WriteMetaFile(const idx2_file& Idx2, const params& P, cstr FileName);
 
 error<idx2_err_code>
 ReadMetaFile(idx2_file* Idx2, cstr FileName);
+
+error<idx2_err_code>
+ReadMetaFileFromBuffer(idx2_file* Idx2, buffer& Buf);
 
 /* Compute the output grid (from, dims, strides) */
 grid
@@ -280,11 +270,6 @@ SetGroupBitPlanes(idx2_file* Idx2, bool GroupBitPlanes);
 
 void
 SetDownsamplingFactor(idx2_file* Idx2, const v3i& DownsamplingFactor3);
-
-#if VISUS_IDX2
-void
-EnableVisus(idx2_file* Idx2);
-#endif
 
 error<idx2_err_code>
 Finalize(idx2_file* Idx2, const params& P);

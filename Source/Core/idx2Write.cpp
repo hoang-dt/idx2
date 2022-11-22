@@ -5,7 +5,11 @@
 #include "FileSystem.h"
 #include "Statistics.h"
 #include "VarInt.h"
+
 #include <string>
+#include <iostream>
+
+#include <Visus/Utils.h>
 
 namespace idx2
 {
@@ -30,8 +34,7 @@ static stat ChunkSzsStat;
 void
 WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 Level, i8 Subband)
 {
-#if VISUS_IDX2 // WriteChunkExponents
-  if (Idx2.visus.enabled){
+  if (Idx2.external_write){
 
     /* brick exponents */
     Flush(&Sc->BrickExpStream);
@@ -43,17 +46,18 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
     Rewind(&Sc->BrickExpStream);
     u64 ChunkExpAddress = GetChunkAddress(Idx2, Sc->LastBrick, Level, Subband, ExponentBitPlane_);
     buffer Buf = ToBuffer(E->ChunkExpStream);
-
-    //write to local storage or trhe cloud
-    std::ostringstream filename;
-    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
-    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkExpAddress;
-    Visus::Utils::saveBinaryDocument(filename.str(),Visus::HeapMemory::createUnmanaged(Buf.Data,Buf.Bytes));
-
+    
+#if 0
+    // write to local storage or trhe cloud
+    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkExpAddress;
+    Visus::Utils::saveBinaryDocument(filename.str(), Visus::HeapMemory::createUnmanaged(Buf.Data, Buf.Bytes));
+#else
+    VisusReleaseAssert(Idx2.external_write(Idx2, Buf, ChunkExpAddress));
+#endif
+    //std::cout << "WriteChunkExponents ChunkExpAddress=" << ChunkExpAddress << " Bytes=" << Buf.Bytes << " bytes=" << (int)Buf.Data[0] << ".." << (int)Buf.Data[Buf.Bytes - 1] << std::endl;
     Rewind(&E->ChunkExpStream);
     return;
   }
-#endif
 
   /* brick exponents */
   Flush(&Sc->BrickExpStream);
@@ -100,8 +104,7 @@ WriteChunkExponents(const idx2_file& Idx2, encode_data* E, sub_channel* Sc, i8 L
 error<idx2_err_code>
 FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
 {
-#if VISUS_IDX2 // FlushChunkExponents
-  if (Idx2.visus.enabled)
+  if (Idx2.external_write)
   {
     Reserve(&E->SortedSubChannels, Size(E->SubChannels));
     Clear(&E->SortedSubChannels);
@@ -117,11 +120,10 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
     InsertionSort(Begin(E->SortedSubChannels), End(E->SortedSubChannels));
 
     idx2_ForEach (Sch, E->SortedSubChannels)
-      WriteChunkExponents(Idx2, E, Sch->SubChannel, Sch->Level, Sch->Subband);
+      WriteChunkExponents(Idx2, E, Sch->SubChannel, Sch->Level, Sch->Subband); //just call  WriteChunkExponents
 
     return idx2_Error(idx2_err_code::NoError);
   }
-#endif
 
   Reserve(&E->SortedSubChannels, Size(E->SubChannels));
   Clear(&E->SortedSubChannels);
@@ -186,8 +188,7 @@ FlushChunkExponents(const idx2_file& Idx2, encode_data* E)
 void
 WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subband, i16 BitPlane)
 {
-#if VISUS_IDX2 // WriteChunk
-  if (Idx2.visus.enabled)
+  if (Idx2.external_write)
   {
     BrickDeltasStat.Add((f64)Size(C->BrickDeltasStream)); // brick deltas
     BrickSzsStat.Add((f64)Size(C->BrickSizeStream));      // brick sizes
@@ -210,17 +211,16 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
 
     u64 ChunkAddress = GetChunkAddress(Idx2, C->LastBrick, Level, Subband, BitPlane);
     buffer Buf = ToBuffer(E->ChunkStream);
-
-    //write to local storage or the cloud
-    std::ostringstream filename;
-    auto dir = Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/");
-    filename << dir << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
+#if 0
+    std::ostringstream filename; filename << Visus::StringUtils::rtrim(std::string(Idx2.Dir.Ptr, Idx2.Dir.Size), "/") << "/" << Idx2.Name << "/" << Idx2.Field << "/" << ChunkAddress;
     Visus::Utils::saveBinaryDocument(filename.str(), Visus::HeapMemory::createUnmanaged(Buf.Data, Buf.Bytes));
-
+#else
+    VisusReleaseAssert(Idx2.external_write(Idx2, Buf, ChunkAddress));
+#endif
+    // std::cout << "WriteChunk ChunkAddress=" << ChunkAddress << " Bytes=" << Buf.Bytes<< " bytes=" << (int)Buf.Data[0] << ".." << (int)Buf.Data[Buf.Bytes - 1] << std::endl;
     Rewind(&E->ChunkStream);
     return;
   }
-#endif
 
   BrickDeltasStat.Add((f64)Size(C->BrickDeltasStream)); // brick deltas
   BrickSzsStat.Add((f64)Size(C->BrickSizeStream));       // brick sizes
@@ -267,8 +267,7 @@ WriteChunk(const idx2_file& Idx2, encode_data* E, channel* C, i8 Level, i8 Subba
 error<idx2_err_code>
 FlushChunks(const idx2_file& Idx2, encode_data* E)
 {
-#if VISUS_IDX2 // FlushChunks
-  if (Idx2.visus.enabled)
+  if (Idx2.external_write)
   {
     Reserve(&E->SortedChannels, Size(E->Channels));
     Clear(&E->SortedChannels);
@@ -283,11 +282,10 @@ FlushChunks(const idx2_file& Idx2, encode_data* E)
       i8 Subband = GetSubbandFromChannelKey(Ch->First);
       i16 BitPlane = BitPlaneFromChannelKey(Ch->First);
       // printf("key %llu level %d subband %d bitplane %d\n", Ch->First, Level, Subband, BitPlane);
-      WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane);
+      WriteChunk(Idx2, E, Ch->Second, Level, Subband, BitPlane); //just call WriteChunk
     }
     return idx2_Error(idx2_err_code::NoError);
   }
-#endif 
 
   Reserve(&E->SortedChannels, Size(E->Channels));
   Clear(&E->SortedChannels);
